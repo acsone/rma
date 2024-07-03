@@ -8,7 +8,6 @@ from itertools import groupby
 
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
-from odoo.tests import Form
 from odoo.tools import html2plaintext
 
 from odoo.addons.stock.models.stock_move import PROCUREMENT_PRIORITIES
@@ -1219,7 +1218,9 @@ class Rma(models.Model):
 
     def _prepare_outgoing_procurement_values(self, warehouse=None, scheduled_date=None):
         values = self._prepare_procurement_values(warehouse, scheduled_date)
-        values.update({"rma_id": self.id})
+        values.update(
+            {"rma_id": self.id, "route_ids": self.warehouse_id.rma_out_route_id}
+        )
         return values
 
     def _prepare_delivery_procurement_values(self, scheduled_date=None):
@@ -1282,9 +1283,9 @@ class Rma(models.Model):
             rma.message_post(
                 body=_(
                     'Return: <a href="#" data-oe-model="stock.picking" '
-                    'data-oe-id="%d">%s</a> has been created.'
+                    'data-oe-id="%(id)d">%(name)s</a> has been created.'
                 )
-                % (picking.id, picking.name)
+                % ({"id": picking.id, "name": picking.name})
             )
         for picking, rmas in pickings.items():
             picking.action_confirm()
@@ -1384,13 +1385,13 @@ class Rma(models.Model):
                     "the previously created moves was updated with this data."
                 )
                 % (
-                {
-                    "id": product.id,
-                    "name": product.display_name,
-                    "qty": qty,
-                    "uom": uom.name,
-                }
-            )
+                    {
+                        "id": product.id,
+                        "name": product.display_name,
+                        "qty": qty,
+                        "uom": uom.name,
+                    }
+                )
             )
         self.write({"state": "waiting_replacement"})
 
