@@ -7,3 +7,5 @@
 
 * Chafique Delli <chafique.delli@akretion.com>
 * Giovanni Serra - Ooops <giovanni@ooops404.com>
+* Souheil Bejaoui - ACSONE SA/NV <souheil.bejaoui@acsone.eu.com>
+* Jacques-Etienne Baudoux - BCIM <je@bcim.be>
