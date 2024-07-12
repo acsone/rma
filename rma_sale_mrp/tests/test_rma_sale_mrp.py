@@ -137,9 +137,8 @@ class TestRmaSaleMrp(TestRmaSaleBase):
         wizard_id = order.action_create_rma()["res_id"]
         wizard = self.env["sale.order.rma.wizard"].browse(wizard_id)
         self.assertEqual(wizard.line_ids.quantity, 0)
-        wizard.line_ids.quantity = 1
         with self.assertRaises(ValidationError):
-            wizard.create_and_open_rma()
+            wizard.line_ids.quantity = 1
 
     def test_report_rma(self):
         wizard = self._rma_sale_wizard(self.sale_order)
