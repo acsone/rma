@@ -14,6 +14,10 @@
                         name="create_rma"
                         attrs="{'invisible': [('picking_type_code', '!=', 'outgoing')]}"
                     />
+                    <field
+                        name="rma_operation_id"
+                        attrs="{'invisible': [('create_rma', '=', False)], 'required': [('create_rma', '=', True)]}"
+                    />
                     <field name="rma_location_ids" invisible="1" />
                     <field name="picking_id" invisible="1" />
                     <field name="picking_type_code" invisible="1" />
