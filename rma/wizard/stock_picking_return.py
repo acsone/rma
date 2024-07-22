@@ -30,6 +30,10 @@ class ReturnPicking(models.TransientModel):
     rma_location_ids = fields.Many2many(
         comodel_name="stock.location", compute="_compute_rma_location_id"
     )
+    rma_operation_id = fields.Many2one(
+        comodel_name="rma.operation",
+        string="Requested operation",
+    )
     # Expand domain for RMAs
     location_id = fields.Many2one(
         domain="create_rma and [('id', 'child_of', rma_location_ids)]"
@@ -91,6 +95,7 @@ class ReturnPicking(models.TransientModel):
             "partner_invoice_id": partner_invoice.id,
             "origin": origin,
             "picking_id": self.picking_id.id,
+            "operation_id": self.rma_operation_id.id,
             "company_id": self.company_id.id,
             "procurement_group_id": group.id,
         }
