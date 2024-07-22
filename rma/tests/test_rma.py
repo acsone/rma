@@ -79,8 +79,11 @@ class TestRma(TransactionCase):
         cls.warehouse = cls.env.ref("stock.warehouse0")
         # Ensure grouping
         cls.env.company.rma_return_grouping = True
+        cls.operation = cls.env.ref("rma.rma_operation_replace")
 
-    def _create_rma(self, partner=None, product=None, qty=None, location=None):
+    def _create_rma(
+        self, partner=None, product=None, qty=None, location=None, operation=None
+    ):
         vals = {}
         if partner:
             vals["partner_id"] = partner.id
@@ -90,12 +93,14 @@ class TestRma(TransactionCase):
             vals["product_uom_qty"] = qty
         if location:
             vals["location_id"] = location.id
+        if operation:
+            vals["operation_id"] = operation.id
         return self.env["rma"].create(vals)
 
     def _create_confirm_receive(
-        self, partner=None, product=None, qty=None, location=None
+        self, partner=None, product=None, qty=None, location=None, operation=None
     ):
-        rma = self._create_rma(partner, product, qty, location)
+        rma = self._create_rma(partner, product, qty, location, operation)
         rma.action_confirm()
         rma.reception_move_id.quantity_done = rma.product_uom_qty
         rma.reception_move_id.picking_id._action_done()
@@ -157,7 +162,9 @@ class TestRmaCase(TestRma):
 
     def test_rma_replace_pick_ship(self):
         self.warehouse.write({"delivery_steps": "pick_ship"})
-        rma = self._create_rma(self.partner, self.product, 1, self.rma_loc)
+        rma = self._create_rma(
+            self.partner, self.product, 1, self.rma_loc, self.operation
+        )
         rma.action_confirm()
         rma.reception_move_id.quantity_done = 1
         rma.reception_move_id.picking_id._action_done()
@@ -232,19 +239,28 @@ class TestRmaCase(TestRma):
             rma.action_confirm()
         self.assertEqual(
             e.exception.args[0],
-            "Required field(s):\nCustomer\nShipping Address\nInvoice Address\nProduct",
+            "Required field(s):\nCustomer\nShipping Address\nInvoice Address\nProduct"
+            "\nRequested operation",
         )
         rma.partner_id = self.partner.id
         with self.assertRaises(ValidationError) as e:
             rma.action_confirm()
-        self.assertEqual(e.exception.args[0], "Required field(s):\nProduct")
+        self.assertEqual(
+            e.exception.args[0], "Required field(s):\nProduct\nRequested operation"
+        )
         rma.product_id = self.product.id
         rma.location_id = self.rma_loc.id
+        with self.assertRaises(ValidationError) as e:
+            rma.action_confirm()
+        self.assertEqual(e.exception.args[0], "Required field(s):\nRequested operation")
+        rma.operation_id = self.operation
         rma.action_confirm()
         self.assertEqual(rma.state, "confirmed")
 
     def test_confirm_and_receive(self):
-        rma = self._create_rma(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_rma(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         rma.action_confirm()
         self.assertEqual(rma.reception_move_id.picking_id.state, "assigned")
         self.assertEqual(rma.reception_move_id.product_id, rma.product_id)
@@ -262,24 +278,30 @@ class TestRmaCase(TestRma):
 
     def test_cancel(self):
         # cancel a draft RMA
-        rma = self._create_rma(self.partner, self.product)
+        rma = self._create_rma(self.partner, self.product, operation=self.operation)
         rma.action_cancel()
         self.assertEqual(rma.state, "cancelled")
         # cancel a confirmed RMA
-        rma = self._create_rma(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_rma(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         rma.action_confirm()
         rma.action_cancel()
         self.assertEqual(rma.state, "cancelled")
         # A RMA is only cancelled from draft and confirmed states
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         with self.assertRaises(UserError):
             rma.action_cancel()
 
     def test_lock_unlock(self):
         # A RMA is only locked from 'received' state
-        rma_1 = self._create_rma(self.partner, self.product, 10, self.rma_loc)
+        rma_1 = self._create_rma(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         rma_2 = self._create_confirm_receive(
-            self.partner, self.product, 10, self.rma_loc
+            self.partner, self.product, 10, self.rma_loc, self.operation
         )
         self.assertEqual(rma_1.state, "draft")
         self.assertEqual(rma_2.state, "received")
@@ -294,7 +316,9 @@ class TestRmaCase(TestRma):
 
     @users("__system__", "user_rma")
     def test_action_refund(self):
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         self.assertEqual(rma.state, "received")
         self.assertTrue(rma.can_be_refunded)
         self.assertTrue(rma.can_be_returned)
@@ -330,18 +354,20 @@ class TestRmaCase(TestRma):
     def test_mass_refund(self):
         # Create, confirm and receive rma_1
         rma_1 = self._create_confirm_receive(
-            self.partner, self.product, 10, self.rma_loc
+            self.partner, self.product, 10, self.rma_loc, self.operation
         )
         # create, confirm and receive 3 more RMAs
         # rma_2: Same partner and same product as rma_1
         rma_2 = self._create_confirm_receive(
-            self.partner, self.product, 15, self.rma_loc
+            self.partner, self.product, 15, self.rma_loc, self.operation
         )
         # rma_3: Same partner and different product than rma_1
         product = self.product_product.create(
             {"name": "Product 2 test", "type": "product"}
         )
-        rma_3 = self._create_confirm_receive(self.partner, product, 20, self.rma_loc)
+        rma_3 = self._create_confirm_receive(
+            self.partner, product, 20, self.rma_loc, self.operation
+        )
         # rma_4: Different partner and same product as rma_1
         partner = self.res_partner.create(
             {
@@ -350,7 +376,9 @@ class TestRmaCase(TestRma):
                 "company_id": self.company.id,
             }
         )
-        rma_4 = self._create_confirm_receive(partner, product, 25, self.rma_loc)
+        rma_4 = self._create_confirm_receive(
+            partner, product, 25, self.rma_loc, self.operation
+        )
         # all rmas are ready to refund
         all_rmas = rma_1 | rma_2 | rma_3 | rma_4
         self.assertEqual(all_rmas.mapped("state"), ["received"] * 4)
@@ -409,7 +437,9 @@ class TestRmaCase(TestRma):
 
     def test_replace(self):
         # Create, confirm and receive an RMA
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         # Replace with another product with quantity 2.
         product_2 = self.product_product.create(
             {"name": "Product 2 test", "type": "product"}
@@ -483,7 +513,9 @@ class TestRmaCase(TestRma):
 
     def test_return_to_customer(self):
         # Create, confirm and receive an RMA
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         # Return the same product with quantity 2 to the customer.
         delivery_form = Form(
             self.env["rma.delivery.wizard"].with_context(
@@ -550,7 +582,9 @@ class TestRmaCase(TestRma):
 
     def test_finish_rma(self):
         # Create, confirm and receive an RMA
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         rma.action_finish()
         finalization_form = Form(
             self.env["rma.finalization.wizard"].with_context(
@@ -567,21 +601,25 @@ class TestRmaCase(TestRma):
     def test_mass_return_to_customer(self):
         # Create, confirm and receive rma_1
         rma_1 = self._create_confirm_receive(
-            self.partner, self.product, 10, self.rma_loc
+            self.partner, self.product, 10, self.rma_loc, self.operation
         )
         # create, confirm and receive 3 more RMAs
         # rma_2: Same partner and same product as rma_1
         rma_2 = self._create_confirm_receive(
-            self.partner, self.product, 15, self.rma_loc
+            self.partner, self.product, 15, self.rma_loc, self.operation
         )
         # rma_3: Same partner and different product than rma_1
         product = self.product_product.create(
             {"name": "Product 2 test", "type": "product"}
         )
-        rma_3 = self._create_confirm_receive(self.partner, product, 20, self.rma_loc)
+        rma_3 = self._create_confirm_receive(
+            self.partner, product, 20, self.rma_loc, self.operation
+        )
         # rma_4: Different partner and same product as rma_1
         partner = self.res_partner.create({"name": "Partner 2 test"})
-        rma_4 = self._create_confirm_receive(partner, product, 25, self.rma_loc)
+        rma_4 = self._create_confirm_receive(
+            partner, product, 25, self.rma_loc, self.operation
+        )
         # all rmas are ready to be returned to the customer
         all_rmas = rma_1 | rma_2 | rma_3 | rma_4
         self.assertEqual(all_rmas.mapped("state"), ["received"] * 4)
@@ -648,21 +686,25 @@ class TestRmaCase(TestRma):
         self.env.company.rma_return_grouping = False
         # Create, confirm and receive rma_1
         rma_1 = self._create_confirm_receive(
-            self.partner, self.product, 10, self.rma_loc
+            self.partner, self.product, 10, self.rma_loc, self.operation
         )
         # create, confirm and receive 3 more RMAs
         # rma_2: Same partner and same product as rma_1
         rma_2 = self._create_confirm_receive(
-            self.partner, self.product, 15, self.rma_loc
+            self.partner, self.product, 15, self.rma_loc, self.operation
         )
         # rma_3: Same partner and different product than rma_1
         product = self.product_product.create(
             {"name": "Product 2 test", "type": "product"}
         )
-        rma_3 = self._create_confirm_receive(self.partner, product, 20, self.rma_loc)
+        rma_3 = self._create_confirm_receive(
+            self.partner, product, 20, self.rma_loc, self.operation
+        )
         # rma_4: Different partner and same product as rma_1
         partner = self.res_partner.create({"name": "Partner 2 test"})
-        rma_4 = self._create_confirm_receive(partner, product, 25, self.rma_loc)
+        rma_4 = self._create_confirm_receive(
+            partner, product, 25, self.rma_loc, self.operation
+        )
         # all rmas are ready to be returned to the customer
         all_rmas = rma_1 | rma_2 | rma_3 | rma_4
         self.assertEqual(all_rmas.mapped("state"), ["received"] * 4)
@@ -687,6 +729,7 @@ class TestRmaCase(TestRma):
             )
         )
         stock_return_picking_form.create_rma = True
+        stock_return_picking_form.rma_operation_id = self.operation
         return_wizard = stock_return_picking_form.save()
         picking_action = return_wizard.create_returns()
         # Each origin move is linked to a different RMA
@@ -715,6 +758,7 @@ class TestRmaCase(TestRma):
         rma_form.move_id = origin_delivery.move_ids.filtered(
             lambda r: r.product_id == self.product
         )
+        rma_form.operation_id = self.operation
         rma = rma_form.save()
         rma.action_confirm()
         rma.reception_move_id.quantity_done = 10
@@ -763,7 +807,9 @@ class TestRmaCase(TestRma):
 
     @mute_logger("odoo.models.unlink")
     def test_rma_to_receive_on_delete_invoice(self):
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         rma.action_refund()
         self.assertEqual(rma.state, "refunded")
         rma.refund_id.unlink()
@@ -781,7 +827,9 @@ class TestRmaCase(TestRma):
         self.assertTrue(warehouse.rma_in_type_id.use_existing_lots)
 
     def test_quantities_on_hand(self):
-        rma = self._create_confirm_receive(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_confirm_receive(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         self.assertEqual(rma.product_id.qty_available, 0)
 
     def test_autoconfirm_email(self):
@@ -806,7 +854,9 @@ class TestRmaCase(TestRma):
         # to avoid uncontrolled side effects
         ctx = self.env.context
         self.env.context = dict(ctx, from_portal=True)
-        rma = self._create_rma(self.partner, self.product, 10, self.rma_loc)
+        rma = self._create_rma(
+            self.partner, self.product, 10, self.rma_loc, self.operation
+        )
         self.env.context = ctx
         mail_draft = self.env["mail.message"].search(
             [("partner_ids", "in", self.partner.ids)]
