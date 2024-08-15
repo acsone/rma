@@ -316,7 +316,6 @@ class Rma(models.Model):
         readonly=True,
         copy=False,
     )
-
     show_create_receipt = fields.Boolean(
         string="Show Create Receipt Button", compute="_compute_show_create_receipt"
     )
@@ -329,7 +328,6 @@ class Rma(models.Model):
     show_create_refund = fields.Boolean(
         string="Show Create refund Button", compute="_compute_show_refund_replace"
     )
-
     # Replace fields, used when the delivery is created automatically
     replace_warehouse_id = fields.Many2one(
         "stock.warehouse",
@@ -338,17 +336,14 @@ class Rma(models.Model):
         store=True,
         readonly=False,
     )
-
     replace_product_id = fields.Many2one(
         "product.product",
         help="Product to be used as the replacement for the returned item.",
     )
-
     replace_product_uom_qty = fields.Float(
         string="Replacement Quantity",
         help="Quantity of the replacement product to be delivered.",
     )
-
     replace_product_uom = fields.Many2one(
         "uom.uom",
         string="Replacement UOM",
@@ -368,12 +363,18 @@ class Rma(models.Model):
                 [("company_id", "=", rec.company_id.id)], limit=1
             )
 
-    @api.depends("operation_id.action_create_delivery")
+    @api.depends(
+        "operation_id.action_create_delivery", "operation_id.different_return_product"
+    )
     def _compute_show_replacement_fields(self):
         for rec in self:
-            rec.show_replacement_fields = rec.operation_id.action_create_delivery in (
-                "automatic_on_confirm",
-                "automatic_after_receipt",
+            rec.show_replacement_fields = (
+                rec.operation_id.different_return_product
+                and rec.operation_id.action_create_delivery
+                in (
+                    "automatic_on_confirm",
+                    "automatic_after_receipt",
+                )
             )
 
     @api.depends("operation_id.action_create_receipt", "state", "reception_move_id")
