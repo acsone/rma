@@ -8,7 +8,7 @@
         name="My RMA"
         inherit_id="rma_sale.sale_rma_request_form"
     >
-        <xpath expr="//t[@t-set='operations']" position="after">
+        <xpath expr="//t[@t-set='operations']" position="before">
 
         <t t-set="reasons" t-value="sale_order.env['rma.reason'].search([])" />
 
