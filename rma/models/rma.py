@@ -368,12 +368,18 @@ class Rma(models.Model):
                 [("company_id", "=", rec.company_id.id)], limit=1
             )
 
-    @api.depends("operation_id.action_create_delivery")
+    @api.depends(
+        "operation_id.action_create_delivery", "operation_id.different_return_product"
+    )
     def _compute_show_replacement_fields(self):
         for rec in self:
-            rec.show_replacement_fields = rec.operation_id.action_create_delivery in (
-                "automatic_on_confirm",
-                "automatic_after_receipt",
+            rec.show_replacement_fields = (
+                rec.operation_id.different_return_product
+                and rec.operation_id.action_create_delivery
+                in (
+                    "automatic_on_confirm",
+                    "automatic_after_receipt",
+                )
             )
 
     @api.depends("operation_id.action_create_receipt", "state", "reception_move_id")
