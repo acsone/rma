@@ -11,7 +11,7 @@
             <xpath expr="//field[@name='product_return_moves']//tree" position="inside">
                 <field
                     name="rma_operation_id"
-                    attrs="{'column_invisible': [('parent.create_rma', '=', False)], 'required': [('parent.create_rma', '=', True)]}"
+                    attrs="{'column_invisible': [('parent.create_rma', '=', False)], 'required': [('parent.create_rma', '=', True), ('quantity', '>', 0)]}"
                 />
             </xpath>
             <field name="product_return_moves" position="before">
