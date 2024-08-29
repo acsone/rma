@@ -157,66 +157,14 @@ class SaleOrderLineRmaWizard(models.TransientModel):
         comodel_name="sale.order.line",
     )
     description = fields.Text()
-
-    # Replace fields, used when the delivery is created automatically
-    replace_warehouse_id = fields.Many2one(
-        "stock.warehouse",
-        help="Warehouse from which the replacement product will be shipped.",
-        compute="_compute_replace_warehouse_id",
-        store=True,
-        readonly=False,
-    )
-
-    replace_product_id = fields.Many2one(
+    return_product_id = fields.Many2one(
         "product.product",
-        help="Product to be used as the replacement for the returned item.",
+        help="Product to be returned if it's different from the originally delivered "
+        "item.",
     )
-
-    replace_product_uom_qty = fields.Float(
-        string="Replacement Quantity",
-        help="Quantity of the replacement product to be delivered.",
+    different_return_product = fields.Boolean(
+        related="operation_id.different_return_product"
     )
-
-    replace_product_uom = fields.Many2one(
-        "uom.uom",
-        string="Replacement UOM",
-        help="Unit of Measure for the replacement product.",
-        default=lambda self: self.env.ref("uom.product_uom_unit").id,
-        compute="_compute_replace_product_uom",
-        store=True,
-        readonly=False,
-    )
-    show_replacement_fields = fields.Boolean(compute="_compute_show_replacement_fields")
-
-    @api.depends("operation_id")
-    def _compute_replace_warehouse_id(self):
-        warehouse_model = self.env["stock.warehouse"]
-        for rec in self:
-            rec.replace_warehouse_id = warehouse_model.search(
-                [("company_id", "=", rec.order_id.company_id.id)], limit=1
-            )
-
-    @api.depends("replace_product_id")
-    def _compute_replace_product_uom(self):
-        for record in self:
-            if record.product_id:
-                record.replace_product_uom = record.replace_product_id.uom_id
-            else:
-                record.replace_product_uom = False
-
-    @api.depends(
-        "operation_id.action_create_delivery", "operation_id.different_return_product"
-    )
-    def _compute_show_replacement_fields(self):
-        for rec in self:
-            rec.show_replacement_fields = (
-                rec.operation_id.different_return_product
-                and rec.operation_id.action_create_delivery
-                in (
-                    "automatic_on_confirm",
-                    "automatic_after_receipt",
-                )
-            )
 
     @api.depends("wizard_id.operation_id")
     def _compute_operation_id(self):
@@ -283,8 +231,5 @@ class SaleOrderLineRmaWizard(models.TransientModel):
             "product_uom": self.uom_id.id,
             "operation_id": self.operation_id.id,
             "description": description,
-            "replace_warehouse_id": self.replace_warehouse_id.id,
-            "replace_product_id": self.replace_product_id.id,
-            "replace_product_uom_qty": self.replace_product_uom_qty,
-            "replace_product_uom": self.replace_product_uom.id,
+            "return_product_id": self.return_product_id.id,
         }

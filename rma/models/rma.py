@@ -328,32 +328,14 @@ class Rma(models.Model):
     show_create_refund = fields.Boolean(
         string="Show Create refund Button", compute="_compute_show_refund_replace"
     )
-    # Replace fields, used when the delivery is created automatically
-    replace_warehouse_id = fields.Many2one(
-        "stock.warehouse",
-        help="Warehouse from which the replacement product will be shipped.",
-        compute="_compute_replace_warehouse_id",
-        store=True,
-        readonly=False,
-    )
-    replace_product_id = fields.Many2one(
+    return_product_id = fields.Many2one(
         "product.product",
-        help="Product to be used as the replacement for the returned item.",
+        help="Product to be returned if it's different from the originally delivered "
+        "item.",
     )
-    replace_product_uom_qty = fields.Float(
-        string="Replacement Quantity",
-        help="Quantity of the replacement product to be delivered.",
+    different_return_product = fields.Boolean(
+        related="operation_id.different_return_product"
     )
-    replace_product_uom = fields.Many2one(
-        "uom.uom",
-        string="Replacement UOM",
-        help="Unit of Measure for the replacement product.",
-        default=lambda self: self.env.ref("uom.product_uom_unit").id,
-        compute="_compute_replace_product_uom",
-        store=True,
-        readonly=False,
-    )
-    show_replacement_fields = fields.Boolean(compute="_compute_show_replacement_fields")
 
     @api.depends("company_id")
     def _compute_replace_warehouse_id(self):
@@ -361,20 +343,6 @@ class Rma(models.Model):
         for rec in self:
             rec.replace_warehouse_id = warehouse_model.search(
                 [("company_id", "=", rec.company_id.id)], limit=1
-            )
-
-    @api.depends(
-        "operation_id.action_create_delivery", "operation_id.different_return_product"
-    )
-    def _compute_show_replacement_fields(self):
-        for rec in self:
-            rec.show_replacement_fields = (
-                rec.operation_id.different_return_product
-                and rec.operation_id.action_create_delivery
-                in (
-                    "automatic_on_confirm",
-                    "automatic_after_receipt",
-                )
             )
 
     @api.depends("operation_id.action_create_receipt", "state", "reception_move_id")
@@ -653,14 +621,6 @@ class Rma(models.Model):
             else:
                 record.product_uom = False
 
-    @api.depends("replace_product_id")
-    def _compute_replace_product_uom(self):
-        for record in self:
-            if record.product_id:
-                record.replace_product_uom = record.replace_product_id.uom_id
-            else:
-                record.replace_product_uom = False
-
     @api.depends("picking_id", "product_id", "company_id")
     def _compute_location_id(self):
         for record in self:
@@ -843,13 +803,24 @@ class Rma(models.Model):
             group = rma.procurement_group_id
             if not group:
                 group = group_model.create(rma._prepare_procurement_group_vals())
+            product = self.product_id
+            if self.different_return_product:
+                if not self.return_product_id:
+                    raise ValidationError(
+                        _(
+                            "The selected operation requires a return product different"
+                            " from the originally delivered item. Please select the "
+                            "product to return."
+                        )
+                    )
+                product = self.return_product_id
             procurements.append(
                 group_model.Procurement(
-                    rma.product_id,
+                    product,
                     rma.product_uom_qty,
                     rma.product_uom,
                     rma.location_id,
-                    rma.product_id.display_name,
+                    product.display_name,
                     group.name,
                     rma.company_id,
                     rma._prepare_reception_procurement_vals(group),
@@ -877,36 +848,6 @@ class Rma(models.Model):
             "res_id": self.reception_move_id.picking_id.id,
         }
 
-    def _create_replace_or_return(self):
-        """create a replace or return order based on the operation seetings"""
-        self.ensure_one()
-        if self.operation_id.different_return_product:
-            if (
-                not self.replace_product_id
-                or not self.replace_product_uom_qty
-                or not self.replace_warehouse_id
-            ):
-                raise ValidationError(
-                    _(
-                        "The selected operation provides for the replacement with a "
-                        "different product. Please complete the replacement "
-                        "information."
-                    )
-                )
-            self.create_replace(
-                fields.Datetime.now(),
-                self.replace_warehouse_id,
-                self.replace_product_id,
-                self.replace_product_uom_qty,
-                self.replace_product_uom,
-            )
-        else:
-            self.with_context(
-                rma_return_grouping=self.env.company.rma_return_grouping
-            ).create_return(
-                fields.Datetime.now(), self.product_uom_qty, self.product_uom
-            )
-
     def action_confirm(self):
         """Invoked when 'Confirm' button in rma form view is clicked."""
         self._ensure_required_fields()
@@ -921,7 +862,11 @@ class Rma(models.Model):
             if rec.operation_id.action_create_receipt == "automatic_on_confirm":
                 rec._create_receipt()
             if rec.operation_id.action_create_delivery == "automatic_on_confirm":
-                rec._create_replace_or_return()
+                rec.with_context(
+                    rma_return_grouping=rec.env.company.rma_return_grouping
+                ).create_return(
+                    fields.Datetime.now(), rec.product_uom_qty, rec.product_uom
+                )
             if rec.operation_id.action_create_refund == "automatic_on_confirm":
                 rec.action_refund()
 
@@ -1562,7 +1507,11 @@ class Rma(models.Model):
         self._send_receipt_confirmation_email()
         for rec in self:
             if rec.operation_id.action_create_delivery == "automatic_after_receipt":
-                rec._create_replace_or_return()
+                rec.with_context(
+                    rma_return_grouping=rec.env.company.rma_return_grouping
+                ).create_return(
+                    fields.Datetime.now(), rec.product_uom_qty, rec.product_uom
+                )
             if rec.operation_id.action_create_refund == "automatic_after_receipt":
                 rec.action_refund()
 

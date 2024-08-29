@@ -35,24 +35,11 @@
                                 name="operation_id"
                                 attrs="{'required': [('quantity', '>', 0)]}"
                             />
-                            <field
-                                name="replace_warehouse_id"
-                                attrs="{'invisible': [('show_replacement_fields', '=', False)], 'required': [('show_replacement_fields', '=', True)]}"
-                            />
                                 <field
-                                name="replace_product_id"
-                                attrs="{'invisible': [('show_replacement_fields', '=', False)], 'required': [('show_replacement_fields', '=', True)]}"
+                                name="return_product_id"
+                                attrs="{'invisible': [('different_return_product', '=', False)], 'required': [('different_return_product', '=', True)]}"
                             />
-                                <field
-                                name="replace_product_uom_qty"
-                                attrs="{'invisible': [('show_replacement_fields', '=', False)], 'required': [('show_replacement_fields', '=', True)]}"
-                            />
-                                <field
-                                name="replace_product_uom"
-                                groups="uom.group_uom"
-                                attrs="{'invisible': [('show_replacement_fields', '=', False)], 'required': [('show_replacement_fields', '=', True)]}"
-                            />
-                            <field name="show_replacement_fields" invisible="1" />
+                            <field name="different_return_product" invisible="1" />
                         </tree>
                     </field>
                 </group>

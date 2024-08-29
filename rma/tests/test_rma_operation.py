@@ -149,15 +149,13 @@ class TestRmaOperation(TestRma):
             ValidationError, msg="Complete the replacement information"
         ):
             rma.action_confirm()
-        self.assertTrue(rma.show_replacement_fields)
-        rma.replace_product_id = self.product_product.create(
-            {"name": "replace Product test 1", "type": "product"}
+        rma.return_product_id = self.product_product.create(
+            {"name": "return Product test 1", "type": "product"}
         )
-        rma.replace_product_uom_qty = 1
         rma.action_confirm()
-        self.assertEqual(rma.delivery_move_ids.product_id, rma.replace_product_id)
-        self.assertEqual(rma.delivery_move_ids.product_uom_qty, 1)
-        self.assertEqual(rma.state, "waiting_replacement")
+        self.assertEqual(rma.delivery_move_ids.product_id, rma.product_id)
+        self.assertEqual(rma.reception_move_id.product_id, rma.return_product_id)
+        self.assertEqual(rma.state, "waiting_return")
 
     def test_08(self):
         """test refund, manually after confirm"""
