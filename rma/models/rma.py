@@ -796,6 +796,7 @@ class Rma(models.Model):
             group = rma.procurement_group_id
             if not group:
                 group = group_model.create(rma._prepare_procurement_group_vals())
+                rma.procurement_group_id = group
             product = self.product_id
             if self.different_return_product:
                 if not self.return_product_id:
