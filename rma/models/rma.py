@@ -796,6 +796,7 @@ class Rma(models.Model):
             group = rma.procurement_group_id
             if not group:
                 group = group_model.create(rma._prepare_procurement_group_vals())
+                rma.procurement_group_id = group
             product = self.product_id
             if self.different_return_product:
                 if not self.return_product_id:
@@ -1233,12 +1234,9 @@ class Rma(models.Model):
             key=lambda rma: [rma._delivery_group_key()],
         )
         for _group, rmas in grouped_rmas:
-            rmas = (
-                self.browse()
-                .concat(*list(rmas))
-                .filtered(lambda rma: not rma.procurement_group_id)
-            )
-            if not rmas:
+            rmas = self.browse().concat(*list(rmas))
+            if not rmas or len(rmas.procurement_group_id) == 1:
+                # if the rmas already grouped, no need to create a new proc group
                 continue
             proc_group = self.env["procurement.group"].create(
                 rmas._prepare_procurement_group_vals()
