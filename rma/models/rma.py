@@ -848,6 +848,14 @@ class Rma(models.Model):
         self = self.filtered(lambda rma: rma.state == "draft")
         if not self:
             return
+        if self.env.company.rma_reception_grouping:
+            self.procurement_group_id = self.env["procurement.group"].create(
+                self._prepare_procurement_group_vals()
+            )
+        procurements = self._prepare_reception_procurements()
+        if procurements:
+            self.env["procurement.group"].run(procurements)
+        self.reception_move_id.picking_id.action_assign()
         self.write({"state": "confirmed"})
         for rma in self:
             rma._add_message_subscribe_partner()
