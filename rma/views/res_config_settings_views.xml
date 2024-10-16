@@ -55,10 +55,10 @@
                     <div class="o_setting_right_pane">
                         <label for="rma_reception_grouping" />
                         <span
-                            class="fa fa-lg fa-building-o"
-                            title="Values set here are company-specific."
-                            groups="base.group_multi_company"
-                        />
+                                    class="fa fa-lg fa-building-o"
+                                    title="Values set here are company-specific."
+                                    groups="base.group_multi_company"
+                                />
                         <div class="text-muted">
                             Enable this option to group multiple RMAs into a single reception picking, simplifying the management of returns when items are received together.
                         </div>
