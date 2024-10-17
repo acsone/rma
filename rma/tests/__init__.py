@@ -2,3 +2,4 @@
 
 from . import test_rma
 from . import test_rma_operation
+from . import test_rma_dashboard
