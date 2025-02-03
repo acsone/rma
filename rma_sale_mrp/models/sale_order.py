@@ -57,6 +57,7 @@ class SaleOrder(models.Model):
                     ).product_uom,
                     "phantom_kit_line": True,
                     "picking": False,
+                    "move": False,
                     "sale_line_id": first_component_dict.get(
                         "sale_line_id", order_line_obj
                     ),
