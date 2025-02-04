@@ -35,6 +35,7 @@ class SaleOrder(models.Model):
             "sale_line_id": data["sale_line_id"].id,
             "uom_id": data["uom"].id,
             "picking_id": data["picking"] and data["picking"].id,
+            "move_id": data["move"] and data["move"].id,
         }
 
     def action_create_rma(self):
@@ -163,6 +164,7 @@ class SaleOrderLine(models.Model):
                         "uom": move.product_uom,
                         "picking": move.picking_id,
                         "sale_line_id": self,
+                        "move": move,
                     }
                 )
         else:
