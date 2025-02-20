@@ -35,7 +35,7 @@ class SaleOrder(models.Model):
             "sale_line_id": data["sale_line_id"].id,
             "uom_id": data["uom"].id,
             "picking_id": data["picking"] and data["picking"].id,
-            "move_id": data["move"] and data["move"].id,
+            "move_id": data.get("move") and data.get("move").id or False,
         }
 
     def action_create_rma(self):
