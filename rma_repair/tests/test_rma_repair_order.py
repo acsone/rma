@@ -13,13 +13,14 @@ class RMARepairOrderTest(TransactionCase):
         )
         cls.rma_loc = cls.warehouse_company.rma_loc_id
         cls.res_partner = cls.env["res.partner"].create({"name": "Test"})
+        cls.operation = cls.env.ref("rma.rma_operation_return")
         cls.rma = cls.env["rma"].create(
             {
                 "product_id": cls.env.ref("product.product_delivery_01").id,
                 "product_uom_qty": 2,
                 "location_id": cls.rma_loc.id,
                 "partner_id": cls.res_partner.id,
-                "operation_id": cls.env.ref("rma.rma_operation_return").id,
+                "operation_id": cls.operation.id,
             }
         )
         repair_form = Form(
@@ -30,6 +31,20 @@ class RMARepairOrderTest(TransactionCase):
             )
         )
         cls.repair_order = repair_form.save()
+        cls.rma_without_repair = cls.env["rma"].create(
+            {
+                "product_id": cls.env.ref("product.product_delivery_01").id,
+                "product_uom_qty": 2,
+                "location_id": cls.rma_loc.id,
+                "partner_id": cls.res_partner.id,
+                "operation_id": cls.operation.id,
+            }
+        )
+
+    @classmethod
+    def _receive_rma(cls, rma):
+        rma.reception_move_id.quantity_done = rma.product_uom_qty
+        rma.reception_move_id.picking_id._action_done()
 
     def test_action_create_repair_order(self):
         action_result = self.rma.action_create_repair_order()
@@ -53,8 +68,7 @@ class RMARepairOrderTest(TransactionCase):
 
     def test_rma_repair_order_done(self):
         self.rma.action_confirm()
-        self.rma.reception_move_id.quantity_done = self.rma.product_uom_qty
-        self.rma.reception_move_id.picking_id._action_done()
+        self._receive_rma(self.rma)
         self.repair_order.action_repair_confirm()
         self.repair_order.action_repair_start()
         self.repair_order.action_repair_end()
@@ -64,8 +78,7 @@ class RMARepairOrderTest(TransactionCase):
 
     def test_rma_repair_order_cancel(self):
         self.rma.action_confirm()
-        self.rma.reception_move_id.quantity_done = self.rma.product_uom_qty
-        self.rma.reception_move_id.picking_id._action_done()
+        self._receive_rma(self.rma)
         self.repair_order.action_repair_confirm()
         self.repair_order.action_repair_start()
         self.repair_order.action_repair_cancel()
@@ -95,3 +108,70 @@ class RMARepairOrderTest(TransactionCase):
                 "domain": [("id", "in", self.repair_order.rma_ids.ids)],
             },
         )
+
+    def test_manually_create_repair_after_confirm(self):
+        """
+        ensure repair can't be created after confirm unless operation allows it
+
+        - by default ("manual_after_receipt"), repair is not allowed after confirm
+        - when set to "manual_on_confirm", repair becomes allowed
+        - verify repair is created and no longer allowed afterward
+        """
+
+        self.assertEqual(self.operation.action_create_repair, "manual_after_receipt")
+        self.rma_without_repair.action_confirm()
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+        self.operation.action_create_repair = "manual_on_confirm"
+        self.assertTrue(self.rma_without_repair.can_be_repaired)
+        self.rma_without_repair._create_repair()
+        self.assertTrue(self.rma_without_repair.repair_id)
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+
+    def test_automatically_create_repair_on_confirm(self):
+        """
+        test that repair is automatically created on confirm if operation allows it
+
+        - with "automatic_on_confirm", repair is created during confirmation
+        - verify repair is not manually allowed after confirm
+        """
+        self.operation.action_create_repair = "automatic_on_confirm"
+        self.rma_without_repair.action_confirm()
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+        self.assertTrue(self.rma_without_repair.repair_id)
+
+    def test_manually_create_repair_after_receipt(self):
+        """
+        test manual repair creation after receipt if operation allows it
+
+        - with "manual_after_receipt", repair isn't allowed after confirm
+        - after receipt, repair becomes allowed
+        - verify repair is created and no longer allowed afterward
+        """
+
+        self.assertEqual(self.operation.action_create_repair, "manual_after_receipt")
+        self.rma_without_repair.action_confirm()
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+        self._receive_rma(self.rma_without_repair)
+        self.assertEqual(self.rma_without_repair.state, "received")
+        self.assertTrue(self.rma_without_repair.can_be_repaired)
+        self.rma_without_repair._create_repair()
+        self.assertTrue(self.rma_without_repair.repair_id)
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+
+    def test_automatically_create_repair_after_receipt(self):
+        """
+        Test automatic repair creation after receipt
+
+        - with "automatic_after_receipt", repair isn't allowed after confirm
+        - repair is auto-created on receipt
+        - verify repair is created and no longer allowed afterward
+        """
+
+        self.operation.action_create_repair = "automatic_after_receipt"
+        self.rma_without_repair.action_confirm()
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+        self._receive_rma(self.rma_without_repair)
+        self.assertEqual(self.rma_without_repair.state, "received")
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
+        self.assertTrue(self.rma_without_repair.repair_id)
+        self.assertFalse(self.rma_without_repair.can_be_repaired)
