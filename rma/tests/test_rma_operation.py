@@ -333,3 +333,22 @@ class TestRmaOperation(TestRma):
         self.assertEqual(rma2.state, "confirmed")
         with self.assertRaises(ValidationError):
             rma2.action_finish()
+
+    def test_manual_finish_if_required_actions_are_done(self):
+        self.operation.action_create_receipt = "automatic_on_confirm"
+        self.operation.action_create_delivery = False
+        self.operation.action_create_refund = False
+        rma = self._create_rma(self.partner, self.product, 1, self.rma_loc)
+        rma.action_confirm()
+        self.assertTrue(rma.requires_action)
+        self.assertEqual(rma.state, "confirmed")
+        with self.assertRaisesRegex(
+            ValidationError, "The reception must be done before finishing this rma"
+        ):
+            rma.action_finish()
+        rma.reception_move_id.quantity_done = rma.product_uom_qty
+        rma.reception_move_id.picking_id._action_done()
+        self.assertFalse(rma.requires_action)
+        self.assertEqual(rma.reception_move_id.state, "done")
+        rma.action_finish()
+        self.assertEqual(rma.state, "finished")
