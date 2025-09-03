@@ -343,7 +343,7 @@ class Rma(models.Model):
         "delivery, or refund.",
     )
 
-    @api.depends("operation_id")
+    @api.depends("operation_id", "reception_move_id.state")
     def _compute_requires_action(self):
         """
         compute whether the RMA requires any follow-up action based on the
@@ -351,7 +351,10 @@ class Rma(models.Model):
         """
         for rma in self:
             rma.requires_action = (
-                rma.operation_id.action_create_receipt
+                (
+                    rma.operation_id.action_create_receipt
+                    and rma.reception_move_id.state != "done"
+                )
                 or rma.operation_id.action_create_delivery
                 or rma.operation_id.action_create_refund
             )
@@ -982,6 +985,13 @@ class Rma(models.Model):
         if not self.requires_action:
             self.state = "finished"
             return {}
+        if (
+            self.operation_id.action_create_receipt
+            and self.reception_move_id.state != "done"
+        ):
+            raise ValidationError(
+                _("The reception must be done before finishing this rma")
+            )
         self._ensure_can_be_returned()
         # Force active_id to avoid issues when coming from smart buttons
         # in other models
