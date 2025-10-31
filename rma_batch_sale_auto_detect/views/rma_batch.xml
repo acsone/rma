@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- Copyright 2025 ACSONE SA/NV
+     License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl). -->
+<odoo>
+    <record id="rma_batch_form_view" model="ir.ui.view">
+        <field name="model">rma.batch</field>
+        <field name="inherit_id" ref="rma_batch.rma_batch_form_view" />
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_ready']" position="before">
+                <button
+                    name="action_ready"
+                    string="Mark as Ready"
+                    type="object"
+                    class="btn-primary"
+                    invisible="state != 'manual'"
+                />
+            </xpath>
+            <xpath expr="//field[@name='rma_ids']//list" position="attributes">
+                <attribute
+                    name="decoration-danger"
+                >has_sale_auto_detect_issue</attribute>
+                <attribute
+                    name="decoration-info"
+                >not has_sale_auto_detect_issue and move_id</attribute>
+            </xpath>
+            <xpath
+                expr="//field[@name='rma_ids']//list//field[@name='operation_id']"
+                position="after"
+            >
+                <field name="order_id" />
+            </xpath>
+        </field>
+    </record>
+</odoo>
