@@ -80,7 +80,7 @@ class TestRMALot(BaseCommon):
         return_wizard.create_rma = True
         return_wizard.rma_operation_id = self.operation
         self.assertEqual(len(return_wizard.product_return_moves), 2)
-        return_wizard.action_create_returns_all()
+        return_wizard.action_create_returns()
         self.assertEqual(self.picking.rma_count, 2)
         rmas = self.picking.move_ids.rma_ids
         rma_lot_1 = rmas.filtered(lambda r, lot=self.lot_1: r.lot_id == lot)
