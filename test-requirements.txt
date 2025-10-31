@@ -1,0 +1,2 @@
+odoo-addon-rma-batch @ git+https://github.com/OCA/rma.git@refs/pull/499/head#subdirectory=rma_batch
+odoo-addon-rma-sale-auto-detect @ git+https://github.com/OCA/rma.git@refs/pull/500/head#subdirectory=rma_sale_auto_detect
