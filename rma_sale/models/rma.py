@@ -219,3 +219,17 @@ class Rma(models.Model):
         new_moves = self.delivery_move_ids - moves_before
         new_moves.picking_id.sale_id = False
         return res
+
+    def _get_reception_group_key(self):
+        """
+        extend the grouping key used when generating reception pickings
+
+        in rma base module, we group receptions by (partner, company, warehouse)
+        When confirming RMAs, we also need to separate receptions by sale order
+        this is because the `sale_id` is assigned to the procurement group, and
+        mixing RMAs from different sale orders in the same picking would make the return
+        as if it was linked to a single sale order, which changes the standard return
+        behavior (i.e: compute of  qty delivered)
+        """
+        key = super()._get_reception_group_key()
+        return key + (self.order_id.id,)

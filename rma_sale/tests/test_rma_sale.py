@@ -328,3 +328,42 @@ class TestRmaSale(TestRmaSaleBase):
         rma.reception_move_id._set_quantity_done(rma.product_uom_qty)
         rma.reception_move_id.picking_id.button_validate()
         self.assertEqual(order.order_line.qty_delivered, 5)
+
+    def test_reception_grouped_by_sale_order(self):
+        """
+        ensure that RMAs linked to different sale orders are not grouped into
+        the same reception picking
+        """
+        sale_order1 = self._create_sale_order([[self.product_1, 5]])
+        sale_order1.action_confirm()
+        sale_order1.picking_ids.move_ids.quantity = 5
+        sale_order1.picking_ids.button_validate()
+        rma1 = self.env["rma"].create(
+            {
+                "partner_id": self.partner.id,
+                "product_id": self.product_1.id,
+                "product_uom_qty": 5,
+                "move_id": sale_order1.order_line.move_ids.id,
+                "order_id": sale_order1.id,
+                "operation_id": self.operation.id,
+            }
+        )
+        sale_order2 = self._create_sale_order([[self.product_1, 5]])
+        sale_order2.action_confirm()
+        sale_order2.picking_ids.move_ids.quantity = 5
+        sale_order2.picking_ids.button_validate()
+        rma2 = self.env["rma"].create(
+            {
+                "partner_id": self.partner.id,
+                "product_id": self.product_1.id,
+                "product_uom_qty": 5,
+                "move_id": sale_order2.order_line.move_ids.id,
+                "order_id": sale_order2.id,
+                "operation_id": self.operation.id,
+            }
+        )
+        (rma1 + rma2).action_confirm()
+
+        self.assertNotEqual(
+            rma1.reception_move_id.picking_id, rma2.reception_move_id.picking_id
+        )
