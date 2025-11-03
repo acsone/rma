@@ -27,7 +27,12 @@
                 expr="//field[@name='rma_ids']//list//field[@name='operation_id']"
                 position="after"
             >
-                <field name="order_id" />
+                <field name="order_id" readonly="not has_sale_auto_detect_issue" />
+                <field name="move_id" readonly="1" optional="hide" />
+            </xpath>
+            <xpath expr="//field[@name='rma_ids']" position="attributes">
+                <attribute name="readonly">state not in ('draft', 'manual')</attribute>
+                <attribute name="context">{'ignore_onchange_order_id': True}</attribute>
             </xpath>
         </field>
     </record>
