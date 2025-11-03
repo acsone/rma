@@ -45,18 +45,35 @@ class Rma(models.Model):
             .sorted(lambda sol: (sol.order_id.date_order, sol.id))
         )
 
-    def action_link_products_to_sale_order(self):
-        """automatically link RMAs to the most relevant sale order lines"""
+    def _link_products_to_sale_order(self, rmas, sale_lines):
+        if not sale_lines:
+            return False
+        sale_line_delivered_qty = self._get_sale_line_delivered_qty(sale_lines)
+        self._link_rmas_to_sale_lines(rmas, sale_lines, sale_line_delivered_qty)
+        return True
+
+    def _link_products_to_sale_order_without_suggestion(self):
         rma_groups = self._group_rmas_for_sale_auto_link()
         for (partner, product, operation), rmas in rma_groups.items():
             sale_lines = self._get_return_eligible_sale_order_lines(
                 partner, product, operation
             )
-            if not sale_lines:
-                continue
-            sale_line_delivered_qty = self._get_sale_line_delivered_qty(sale_lines)
-            self._link_rmas_to_sale_lines(rmas, sale_lines, sale_line_delivered_qty)
+            self._link_products_to_sale_order(rmas, sale_lines)
 
+    def _link_products_to_sale_order_with_suggestion(self):
+        for rma in self:
+            sale_lines = rma.order_id.order_line.filtered(
+                lambda line, r=rma: line.product_id == r.product_id
+            )
+            self._link_products_to_sale_order(rma, sale_lines)
+
+    def action_link_products_to_sale_order(self):
+        """automatically link RMAs to the most relevant sale order lines"""
+        rma_to_link = self.filtered(lambda r: not r.sale_line_id)
+        rma_to_link_without_suggestion = rma_to_link.filtered(lambda r: not r.order_id)
+        rma_to_link_with_suggestion = rma_to_link.filtered("order_id")
+        rma_to_link_without_suggestion._link_products_to_sale_order_without_suggestion()
+        rma_to_link_with_suggestion._link_products_to_sale_order_with_suggestion()
         # Mark remaining unmatched RMAs
         not_linked_rmas = self.filtered(lambda r: not r.move_id)
         not_linked_rmas.has_sale_auto_detect_issue = True

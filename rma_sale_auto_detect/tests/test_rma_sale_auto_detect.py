@@ -8,7 +8,9 @@ from .common import TestRmaSaleAutoDetectBase
 class TestRmaSaleAutoDetect(TestRmaSaleAutoDetectBase):
     def test_0(self):
         """sale order older than the operation return eligibility period should not be
-        linked"""
+        linked automatically
+        if a sale order is suggested by the user the link is created even if the
+        eligibility period is not respected"""
         sale_order = self._create_and_confirm_sale_order(
             self.partner, [(self.product, 5)], 60
         )
@@ -21,6 +23,11 @@ class TestRmaSaleAutoDetect(TestRmaSaleAutoDetectBase):
             rma.sale_auto_detect_note,
             "No delivery move found or insufficient delivered quantity.",
         )
+        rma.order_id = sale_order
+        rma.action_link_products_to_sale_order()
+        self.assertTrue(rma.move_id)
+        self.assertFalse(rma.has_sale_auto_detect_issue)
+        self.assertFalse(rma.sale_auto_detect_note)
 
     def test_1(self):
         """exact match between rma and sale line delivered qty with one delivery"""
@@ -185,3 +192,21 @@ class TestRmaSaleAutoDetect(TestRmaSaleAutoDetectBase):
         rma4.action_link_products_to_sale_order()
         # all delivered qty already linked, new rma should not be linked
         self.assertFalse(rma4.sale_line_id)
+
+    def test_10(self):
+        """When user suggest the sale order and there is multiple delivery moves
+        the rma is split"""
+        sale_order = self._create_and_confirm_sale_order(
+            self.partner, [(self.product, 5)], 60
+        )
+        self._process_picking(sale_order.picking_ids, self.product, 3)
+        self._process_picking(sale_order.picking_ids, self.product, 2)
+        rma = self._create_rma(self.partner, self.product, 5, self.operation)
+        rma.order_id = sale_order
+        rma.action_link_products_to_sale_order()
+        self.assertTrue(rma.move_id)
+        self.assertFalse(rma.has_sale_auto_detect_issue)
+        self.assertFalse(rma.sale_auto_detect_note)
+        rmas = sale_order.order_line.move_ids.rma_ids
+        self.assertEqual(len(rmas), 2)
+        self.assertEqual(sum(rmas.mapped("product_uom_qty")), 5)
