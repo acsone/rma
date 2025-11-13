@@ -25,5 +25,4 @@ class StockMove(models.Model):
                 rma.product_uom._compute_quantity(rma.product_uom_qty, move.product_uom)
                 for rma in move.rma_ids
             )
-            remaining = move.product_uom_qty - already_in_rma
-            move.rma_returnable_uom_qty = max(remaining, 0)
+            move.rma_returnable_uom_qty = move.product_uom_qty - already_in_rma
