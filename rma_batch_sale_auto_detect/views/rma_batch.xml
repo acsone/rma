@@ -13,7 +13,7 @@
                     string="Quick Confirm"
                     type="object"
                     class="btn-primary"
-                    invisible="not quick_confirm and state not in ('ready', 'manual')"
+                    invisible="not quick_confirm"
                 />
                 <button
                     name="action_ready"

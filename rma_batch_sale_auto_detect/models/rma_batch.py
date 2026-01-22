@@ -32,7 +32,7 @@ class RmaBatch(models.Model):
         for batch in self:
             batch.quick_confirm = False
             valid = all([not rma.sale_line_id for rma in batch.rma_ids])
-            batch.quick_confirm = batch.state in ("ready", "manual") and valid
+            batch.quick_confirm = batch.state == "ready" and valid
 
     def action_quick_confirm(self):
         """Confirm the RMA batch even when all RMAs are not linked to sale order lines
