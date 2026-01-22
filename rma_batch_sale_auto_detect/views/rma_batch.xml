@@ -7,6 +7,14 @@
         <field name="inherit_id" ref="rma_batch.rma_batch_form_view" />
         <field name="arch" type="xml">
             <xpath expr="//button[@name='action_ready']" position="before">
+                <field name="quick_confirm" invisible="1" />
+                <button
+                    name="action_quick_confirm"
+                    string="Quick Confirm"
+                    type="object"
+                    class="btn-primary"
+                    invisible="not quick_confirm and state not in ('ready', 'manual')"
+                />
                 <button
                     name="action_ready"
                     string="Mark as Ready"
