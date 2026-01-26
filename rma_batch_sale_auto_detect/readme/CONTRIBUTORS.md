@@ -1,1 +1,2 @@
 - Souheil Bejaoui <souheil.bejaoui@acsone.eu>
+- Stéphane Mangin <stephane.mangin@webmel.com>
