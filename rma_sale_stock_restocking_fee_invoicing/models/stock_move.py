@@ -7,6 +7,18 @@ from odoo import models
 class StockMove(models.Model):
     _inherit = "stock.move"
 
+    def _is_restocking_fee_chargeable(self):
+        """
+        super() method from sale_stock_restocking_fee_invoicing
+        always returns False if move has no origin_returned_move_id.
+        But for RMAs it may happen that we create a RMA from scratch, not linked
+        to an origin move.
+        """
+        res = super()._is_restocking_fee_chargeable()
+        if self.rma_receiver_ids and self.charge_restocking_fee:
+            return True
+        return res
+
     def _action_done(self, cancel_backorder=False):
         res = super()._action_done(cancel_backorder=cancel_backorder)
         chargeable_moves = self.filtered(
