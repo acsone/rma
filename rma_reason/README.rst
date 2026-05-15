@@ -51,10 +51,10 @@ Configuration
 
 To configure this module, you need to:
 
--  Go to **Inventory > Settings > Settings** and select whether the
-   reason is mandatory or not.
--  Go to **RMA > Settings > RMA Reasons** and create the RMA reasons for
-   your company.
+- Go to **Inventory > Settings > Settings** and select whether the
+  reason is mandatory or not.
+- Go to **RMA > Settings > RMA Reasons** and create the RMA reasons for
+  your company.
 
 Usage
 =====
@@ -84,8 +84,8 @@ Authors
 Contributors
 ------------
 
--  Jacques-Etienne Baudoux - BCIM je@bcim.be
--  Souheil Bejaoui - ACSONE SA/NV souheil.bejaoui@acsone.eu
+- Jacques-Etienne Baudoux - BCIM je@bcim.be
+- Souheil Bejaoui - ACSONE SA/NV souheil.bejaoui@acsone.eu
 
 Maintainers
 -----------
