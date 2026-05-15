@@ -2,7 +2,7 @@
 # Copyright 2023 Tecnativa - Pedro M. Baeza
 # License AGPL-3.0 or later (https://www.gnu.org/licenses/agpl).
 
-from odoo import api, fields, models
+from odoo import _, api, fields, models
 from odoo.tools import float_compare
 
 
@@ -196,3 +196,28 @@ class Rma(models.Model):
         ):
             vals["sale_line_id"] = self.move_id.sale_line_id.id
         return vals
+<<<<<<< HEAD
+=======
+
+    def create_replace(self, scheduled_date, warehouse, product, qty, uom):
+        # When the procurement group has the sale id set it will propagate to the
+        # pickings. This is inconvenient for this operation as when we confirm the
+        # customer delivery a new order line will be created with the replaced option
+        # which will be set for invoicing.
+        moves_before = self.delivery_move_ids
+        res = super().create_replace(scheduled_date, warehouse, product, qty, uom)
+        new_moves = self.delivery_move_ids - moves_before
+        new_moves.picking_id.sale_id = False
+        return res
+
+    def action_link_to_sale_order(self):
+        self.ensure_one()
+        return {
+            "name": _("Link to sale order"),
+            "type": "ir.actions.act_window",
+            "view_mode": "form",
+            "res_model": "rma.sale.order.link.wizard",
+            "target": "new",
+            "context": {"default_rma_id": self.id, **self.env.context},
+        }
+>>>>>>> 7a0a726 ([IMP] rma_sale: manually link RMAs to sale orders)

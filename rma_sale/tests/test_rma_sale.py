@@ -316,3 +316,34 @@ class TestRmaSale(TestRmaSaleBase):
         rma.reception_move_id.quantity_done = rma.product_uom_qty
         rma.reception_move_id.picking_id._action_done()
         self.assertEqual(order.order_line.qty_delivered, 5)
+
+    def test_grouping_reception(self):
+        sale_order = self._create_sale_order([[self.product_1, 5], [self.product_2, 3]])
+        sale_order.action_confirm()
+        sale_order.picking_ids.action_set_quantities_to_reservation()
+        sale_order.picking_ids.button_validate()
+        wizard = self._rma_sale_wizard(sale_order)
+        rmas = self.env["rma"].search(wizard.create_and_open_rma()["domain"])
+        self.assertEqual(len(rmas.reception_move_id.group_id), 1)
+        self.assertEqual(len(rmas.reception_move_id.picking_id), 1)
+
+    def test_link_to_sale_order(self):
+        rma_vals = {
+            "partner_id": self.partner.id,
+            "product_id": self.product_1.id,
+            "product_uom_qty": 5,
+            "location_id": self.sale_order.warehouse_id.rma_loc_id.id,
+            "operation_id": self.operation.id,
+        }
+        rma = self.env["rma"].create(rma_vals)
+        rma.action_confirm()
+        action = rma.action_link_to_sale_order()
+        wizard = (
+            self.env[action.get("res_model")]
+            .with_context(**action.get("context"))
+            .create({"sale_order_id": self.sale_order.id})
+        )
+        self.assertEqual(wizard.rma_id, rma)
+        self.assertFalse(rma.order_id)
+        wizard.action_link_rma_to_sale_order()
+        self.assertEqual(rma.order_id, self.sale_order)
