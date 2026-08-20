@@ -10,6 +10,7 @@ from itertools import groupby
 from odoo import _, api, fields, models
 from odoo.exceptions import AccessError, ValidationError
 from odoo.tools import html2plaintext
+from odoo.tools.misc import clean_context
 
 from odoo.addons.stock.models.stock_move import PROCUREMENT_PRIORITIES
 
@@ -248,6 +249,17 @@ class Rma(models.Model):
         string="Reception move",
         copy=False,
     )
+    reception_status = fields.Selection(
+        [
+            ("not_required", "Not required"),
+            ("pending", "Pending reception"),
+            ("received", "Received"),
+        ],
+        compute="_compute_reception_status",
+        store=True,
+        index=True,
+        copy=False,
+    )
     # Refund fields
     refund_id = fields.Many2one(
         comodel_name="account.move",
@@ -361,6 +373,23 @@ class Rma(models.Model):
                 or rma.operation_id.action_create_delivery
                 or rma.operation_id.action_create_refund
             )
+
+    @api.depends(
+        "operation_id.action_create_receipt",
+        "reception_move_id.state",
+        "state",
+    )
+    def _compute_reception_status(self):
+        """compute the dedicated reception progress, independent from delivery"""
+        for rma in self:
+            if not rma.operation_id.action_create_receipt:
+                rma.reception_status = "not_required"
+            elif rma.reception_move_id.state == "done":
+                rma.reception_status = "received"
+            elif rma.state in ("draft", "cancelled"):
+                rma.reception_status = "not_required"
+            else:
+                rma.reception_status = "pending"
 
     @api.depends("operation_id.action_create_receipt", "state", "reception_move_id")
     def _compute_show_create_receipt(self):
@@ -521,12 +550,7 @@ class Rma(models.Model):
             r.can_be_replaced = (
                 r.operation_id.action_create_delivery
                 in ("manual_after_receipt", "automatic_after_receipt")
-                and r.state
-                in [
-                    "received",
-                    "waiting_replacement",
-                    "replaced",
-                ]
+                and r.state == "received"
             ) or (
                 r.operation_id.action_create_delivery
                 in ("manual_on_confirm", "automatic_on_confirm")
@@ -889,6 +913,12 @@ class Rma(models.Model):
 
     def action_confirm(self):
         """Invoked when 'Confirm' button in rma form view is clicked."""
+        # It is important to "clear" the default_operation_id key from the context to
+        # prevent an attempt to set that value in the stock.move record that will be
+        # created for the operation_id field if mrp is installed.
+        self = self.with_context(  # pylint: disable=W8121
+            clean_context(self.env.context)
+        )
         self._ensure_required_fields()
         self = self.filtered(lambda rma: rma.state == "draft")
         if not self:
@@ -1021,6 +1051,7 @@ class Rma(models.Model):
     def action_cancel(self):
         """Invoked when 'Cancel' button in rma form view is clicked."""
         self.reception_move_id._action_cancel()
+        self.delivery_move_ids._action_cancel()
         self.write({"state": "cancelled"})
 
     def action_draft(self):
