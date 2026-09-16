@@ -117,7 +117,10 @@ class Rma(models.Model):
 
     @api.model
     def _sort_sale_lines_by_order_date(self, sale_lines):
-        return sale_lines.sorted(lambda sol: (sol.order_id.date_order, sol.id))
+        reverse = bool(self.operation_id.return_eligibility_order != "older_first")
+        return sale_lines.sorted(
+            lambda sol: (sol.order_id.date_order, sol.id), reverse=reverse
+        )
 
     def _prepare_new_rma_for_sale_link_values(self, qty):
         self.ensure_one()
@@ -133,7 +136,7 @@ class Rma(models.Model):
             return matched_rmas
         sale_line_delivered_qty = self._get_sale_line_returnable_qty(sale_lines)
         rmas = self.sorted("date")
-        sale_lines = sale_lines.sorted(lambda sol: (sol.order_id.date_order, sol.id))
+        sale_lines = self._sort_sale_lines_by_order_date(sale_lines)
 
         rma_index = 0
         sale_index = 0
